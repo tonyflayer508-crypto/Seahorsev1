@@ -2,7 +2,7 @@ import React from 'react'
 
 const PublishPage = () => {
     return (
-        <div>ublishPage</div>
+        <div>PublishPage</div>
     )
 }
 
