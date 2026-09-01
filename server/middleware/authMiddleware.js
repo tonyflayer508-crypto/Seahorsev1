@@ -4,8 +4,8 @@ export function authMiddleware(req, res, next) {
     const token = req.cookies.token;
 
     if(!token) {
-        res.status(401).json({ error: "Access denied. No  session token provided" });
-       
+       return res.status(401).json({ error: "Access denied. No  session token provided" });
+        
     }
 
     try {
@@ -14,6 +14,6 @@ export function authMiddleware(req, res, next) {
         req.user = decoded;
         next();
     } catch (error) {
-        res.status(401).json({ error: "Session expired or invalid. Please log in again." });
+       return res.status(401).json({ error: "Session expired or invalid. Please log in again." });
     }
 }
