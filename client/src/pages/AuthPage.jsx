@@ -1,7 +1,7 @@
 import React from 'react'
 import LoginLeft from '../components/LoginLeft';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 import { useAppContext } from '../context/AppContext';
 
@@ -28,10 +28,21 @@ const AuthPage = ({mode}) => {
         setloading(true)
 
         try {
+            const trimmedName = name.trim();
+            const trimmedEmail = email.trim();
+
+            if (!isLogin && trimmedName.length < 2) {
+                throw new Error("Please enter your full name");
+            }
+
+            if (password.length < 8) {
+                throw new Error("Password must be at least 8 characters");
+            }
+
             if(mode === "login"){
-                await login(email, password)
+                await login(trimmedEmail, password)
             }else{
-                await register(name, email, password)
+                await register(trimmedName, trimmedEmail, password)
             }
             navigate("/")
         } catch (err) {
@@ -121,7 +132,7 @@ const AuthPage = ({mode}) => {
                                 className='absolute right-2 top-1/2 -translate-y-1/2 text-zinc-300
                                 hover:text-zinc-600 flex items-center justify-center
                                 cursor-pointer transition-colors'>
-                                    {showPassword ? <EyeOffIcon size={19}/> : <EyeOffIcon size={19}/>}
+                                    {showPassword ? <EyeOffIcon size={19}/> : <EyeIcon size={19}/>}
 
                             </button>
 

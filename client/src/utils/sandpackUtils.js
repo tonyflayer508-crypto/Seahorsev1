@@ -34,5 +34,14 @@ export function detectDependencies(files) {
             deps[pkg] = "latest";
         }
     }
+
+    // Font Awesome React and icon packages require the shared core package at runtime.
+    if (
+        deps["@fortawesome/react-fontawesome"] ||
+        Object.keys(deps).some((pkg) => pkg.startsWith("@fortawesome/free-"))
+    ) {
+        deps["@fortawesome/fontawesome-svg-core"] = "latest";
+    }
+
     return deps;
 }

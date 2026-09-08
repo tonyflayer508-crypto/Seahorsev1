@@ -59,27 +59,6 @@ const ShapesDots = ({
 
   const propsRef = useRef({});
 
-  propsRef.current = {
-    cellSize,
-    influenceRadiusVmin,
-    attackTime,
-    releaseTime,
-    idleScale,
-    minPeakScale,
-    maxPeakScale,
-    burstSpeed,
-    burstThickness,
-    backgroundColor,
-    shapes,
-    colors,
-    dpr,
-    opacity,
-    animationMode,
-    animationSpeed,
-    overlapGuard,
-    rotationVariance,
-  };
-
   const rebuildRef = useRef(false);
 
   const prevLayout = useRef({
@@ -93,6 +72,27 @@ const ShapesDots = ({
   });
 
   useEffect(() => {
+    propsRef.current = {
+      cellSize,
+      influenceRadiusVmin,
+      attackTime,
+      releaseTime,
+      idleScale,
+      minPeakScale,
+      maxPeakScale,
+      burstSpeed,
+      burstThickness,
+      backgroundColor,
+      shapes,
+      colors,
+      dpr,
+      opacity,
+      animationMode,
+      animationSpeed,
+      overlapGuard,
+      rotationVariance,
+    };
+
     const sig = {
       cellSize,
       shapes: JSON.stringify(shapes),

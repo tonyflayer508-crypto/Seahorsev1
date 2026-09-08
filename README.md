@@ -1,8 +1,8 @@
-# 🎬 ReelGen
+# Builder AI
 
-### AI-Powered Video Generation Platform
+### AI-Powered React Website Builder
 
-ReelGen is a modern AI-powered web application for creating short-form marketing videos from simple prompts and product information.
+Builder AI is a React and Express application for generating, editing, previewing, and publishing websites from natural-language prompts.
 
 Create engaging videos for products, brands, social media, and marketing campaigns — without complicated video-editing software.
 
@@ -10,16 +10,15 @@ Create engaging videos for products, brands, social media, and marketing campaig
 
 ## ✨ Features
 
-* 🤖 AI-powered video generation
-* 📝 Prompt-based video creation
-* 🖼️ Product image upload
-* 🎭 AI-generated scenes and visuals
-* 📱 Multiple aspect ratios
-* 🎬 Short-form social media videos
+* 🤖 AI-powered website generation
+* 📝 Prompt-based project creation
+* 🧩 Progressive file generation with live status
+* 🖥️ Sandpack-powered previews
+* ✏️ In-browser file editing and autosave
+* 🌐 Public project publishing
 * ⚡ Fast and responsive interface
 * 📂 Generation history
 * 👤 User authentication
-* 💜 Modern purple-themed UI
 * 📱 Responsive design
 * 🔐 Secure API integration
 
@@ -41,8 +40,7 @@ Create engaging videos for products, brands, social media, and marketing campaig
 
 * Node.js
 * Express.js
-* MongoDB
-* Mongoose
+* Supabase (PostgreSQL)
 * JWT Authentication
 * bcrypt
 * dotenv
@@ -50,8 +48,8 @@ Create engaging videos for products, brands, social media, and marketing campaig
 
 ### AI
 
-* Google AI Studio / Gemini API
-* AI-powered video generation pipeline
+* OpenRouter-compatible AI models
+* Structured file planning and code generation
 
 ---
 
@@ -123,16 +121,21 @@ npm install
 Create a `.env` file inside the `server` directory.
 
 ```env
-PORT=5000
+PORT=3000
 
-MONGODB_URI=your_mongodb_connection_string
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 JWT_SECRET=your_jwt_secret
 
-GEMINI_API_KEY=your_google_ai_studio_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_MODEL=openrouter/free
+AI_MAX_CONCURRENCY=6
 
-CLIENT_URL=http://localhost:5173
+ORIGINS=http://localhost:5173
 ```
+
+Run the SQL in `supabase/schema.sql` in the Supabase SQL Editor before starting the server. The backend uses the service role key only on the server; never expose it in the client.
 
 ⚠️ **Never commit your `.env` file to GitHub.**
 
@@ -174,7 +177,7 @@ http://localhost:5173
 
 ---
 
-## 🎥 Video Generation Flow
+## 🧱 Website Generation Flow
 
 ```text
 User
@@ -183,7 +186,7 @@ User
 Enter Prompt
   │
   ▼
-Upload Product Image
+Plan Project Files
   │
   ▼
 ReelGen Frontend
@@ -195,16 +198,16 @@ Backend API
 AI Generation Pipeline
   │
   ▼
-Generate Scenes
+Generate React Files
   │
   ▼
-Generate Video
+Preview and Edit
   │
   ▼
-Store Generation
+Publish Project
   │
   ▼
-User Downloads / Shares Video
+User Shares Public URL
 ```
 
 ---

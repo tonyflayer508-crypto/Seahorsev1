@@ -1,26 +1,18 @@
-import mongoose, {Schema} from 'mongoose'
-import bcrypt from 'bcrypt'
+import bcrypt from "bcrypt";
+import { SupabaseModel } from "./supabaseModel.js";
 
+export class UserModel extends SupabaseModel {
+    static table = "users";
 
-const UserSchema =new Schema({
-    name: {type: String, required: true},
-    email: { type: String, required: true, unique: true, lowercase: true,
-    trim: true },
-    password: { type: String, required: true },
-    },{timestamps: true})
-
-    // Hash password befor saving
-    UserSchema.pre('save', async function() {
-        if(!this.isModified('password')) return;
-        const salt = await  bcrypt.genSalt(10)
-        this.password = await bcrypt.hash(this.password, salt)   
-    })
-
-    // Compare password method
-
-    UserSchema.method.comparePassword = async function (password) {
-        return bcrypt.compare(password, this.password)
+    static async create(values) {
+        const user = { ...values };
+        user.password = await bcrypt.hash(user.password, 10);
+        return super.create(user);
     }
 
+    async comparePassword(password) {
+        return bcrypt.compare(password, this.password);
+    }
+}
 
-    export const User = mongoose.model('User', UserSchema)
+export const User = UserModel;

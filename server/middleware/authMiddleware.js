@@ -1,5 +1,15 @@
 import jwt from "jsonwebtoken";
 
+function getJwtSecret() {
+    const secret = process.env.JWT_SECRET?.trim();
+
+    if (!secret) {
+        throw new Error("JWT_SECRET is not configured");
+    }
+
+    return secret;
+}
+
 export function authMiddleware(req, res, next) {
     const token = req.cookies?.token;
 
@@ -9,7 +19,7 @@ export function authMiddleware(req, res, next) {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "fallback_secret");
+        const decoded = jwt.verify(token, getJwtSecret());
         req.user = decoded;
         next();
     } catch (error) {

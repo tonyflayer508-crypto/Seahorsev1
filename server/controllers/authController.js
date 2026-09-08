@@ -1,11 +1,19 @@
 import { User } from "../models/User.js";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
+function getJwtSecret() {
+    const secret = process.env.JWT_SECRET?.trim();
+
+    if (!secret) {
+        throw new Error("JWT_SECRET is not configured");
+    }
+
+    return secret;
+}
 
 // Helper to set cookie
 const setTokenCookie = (res, payload) => {
-    const token = jwt.sign(payload, JWT_SECRET, {
+    const token = jwt.sign(payload, getJwtSecret(), {
         expiresIn: "30d",
     });
 
@@ -23,13 +31,26 @@ export async function register(req, res) {
     try {
         const { name, email, password } = req.body;
 
-        if (!name || !email || !password) {
+        if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string") {
             return res.status(400).json({
                 error: "Name, email, and password are required",
             });
         }
 
+        const trimmedName = name.trim();
         const trimmedEmail = email.trim().toLowerCase();
+
+        if (trimmedName.length < 2) {
+            return res.status(400).json({
+                error: "Name must be at least 2 characters",
+            });
+        }
+
+        if (!trimmedEmail || password.length < 8) {
+            return res.status(400).json({
+                error: "Email is required and password must be at least 8 characters",
+            });
+        }
 
         const existing = await User.findOne({
             email: trimmedEmail,
@@ -42,7 +63,7 @@ export async function register(req, res) {
         }
 
         const user = await User.create({
-            name: name.trim(),
+            name: trimmedName,
             email: trimmedEmail,
             password,
         });

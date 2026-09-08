@@ -10,7 +10,23 @@ import projectRouter from "./routes/ProjectRoutes.js";
 
 const app = express();
 
-// Connect to MongoDB
+const requiredEnvironmentVariables = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "JWT_SECRET",
+    "OPENROUTER_API_KEY",
+];
+const missingEnvironmentVariables = requiredEnvironmentVariables.filter(
+    (name) => !process.env[name]?.trim()
+);
+
+if (missingEnvironmentVariables.length > 0) {
+    throw new Error(
+        `Missing required environment variables: ${missingEnvironmentVariables.join(", ")}`
+    );
+}
+
+// Verify the database connection before accepting requests.
 await connectToDatabase();
 
 const allowedOrigins = (

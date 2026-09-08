@@ -1,6 +1,7 @@
 import { Project } from '../models/Project.js';
 import crypto from 'crypto';
 import { generateProject } from '../services/ai.js';
+import { validateAndFixCode } from '../services/codeValidator.js';
 
 function hashContent(content) {
   return crypto.createHash("md5").update(content).digest('hex').slice(0, 12);
@@ -62,6 +63,7 @@ error: null,
 // Background worker to progressively generate files and update database in real-time.
  async function runBackgroundGeneration(projectId, prompt) {
    try {
+    let filePersistenceQueue = Promise.resolve();
     console.log(`[Background AI] Starting generation for project ${projectId}`);
       const result = await generateProject(prompt, {
         onPlan: async (plan) =>{
@@ -91,28 +93,40 @@ error: null,
         onFileComplete: async (path, code)=>{
              console.log(`[Background AI] Completed file ${path} for project ${projectId}`); 
 
-            const project = await Project.findById(projectId);
+            const persistFile = filePersistenceQueue.then(async () => {
+              const project = await Project.findById(projectId);
 
-            if(project){
-                const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-                project.files = project.files || {};
-                project.files[normalizedPath] = { content: code, hash:
-                  hashContent(code)};
-                  project.filesGenerated = [...(project.filesGenerated || []), path];
-                    project.messages.push({
-                      role: "assistant",
-                      content: `Created file "${normalizedPath}"`,
-                      timestamp: new Date(),
-                    });
-                project.currentFile = null;
-                project.markModified("files");
-                await project.save();
-            }
+              if(project){
+                  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+                  project.files = project.files || {};
+                  project.files[normalizedPath] = { content: code, hash:
+                    hashContent(code)};
+                  project.filesGenerated = [...(project.filesGenerated || []), normalizedPath];
+                  project.messages.push({
+                    role: "assistant",
+                    content: `Created file "${normalizedPath}"`,
+                    timestamp: new Date(),
+                  });
+                  project.currentFile = null;
+                  project.markModified("files");
+                  await project.save();
+              }
+            });
+
+            filePersistenceQueue = persistFile.catch(() => undefined);
+            await persistFile;
         }    
       })
       console.log(`[Background AI] Successfully generated project ${projectId}`); 
             const project = await Project.findById(projectId);
             if(project){
+              for (const [path, code] of Object.entries(result.files || {})) {
+                if (!project.files?.[path]) {
+                  project.files = project.files || {};
+                  project.files[path] = { content: code, hash: hashContent(code) };
+                  project.filesGenerated = [...(project.filesGenerated || []), path];
+                }
+              }
               project.status = "completed";
               project.version = String(Number(project.version || 0) + 1);
               if(result.description){
@@ -220,8 +234,9 @@ if(!req.user) {
     return;
   }
   const filesObject = {};
-  for (const [path, entry] of Object.entries(project.files)) {
-    filesObject[path] = entry.content;
+  const projectFiles = Object.keys(project.files || {}).map((path) => ({ path }));
+  for (const [path, entry] of Object.entries(project.files || {})) {
+    filesObject[path] = validateAndFixCode(entry.content, path, { allPlannedFiles: projectFiles }).code;
   }
 res.json({
        _id: project._id,
@@ -285,8 +300,9 @@ export async function updateProjectFiles(req, res) {
   await project.save();
 
 const filesObject = {};
-  for (const [path, entry] of Object.entries(project.files)) {
-    filesObject[path] = entry.content;
+  const projectFiles = Object.keys(project.files || {}).map((path) => ({ path }));
+  for (const [path, entry] of Object.entries(project.files || {})) {
+    filesObject[path] = validateAndFixCode(entry.content, path, { allPlannedFiles: projectFiles }).code;
 }
 res.json({
  _id: project._id,
@@ -338,8 +354,9 @@ export async function getPublicProject(req, res) {
     return;
   }
   const filesObject = {};
-  for (const [path, entry] of Object.entries(project.files)) {
-    filesObject[path] = entry.content;
+  const projectFiles = Object.keys(project.files || {}).map((path) => ({ path }));
+  for (const [path, entry] of Object.entries(project.files || {})) {
+    filesObject[path] = validateAndFixCode(entry.content, path, { allPlannedFiles: projectFiles }).code;
   }
   res.json({
     _id: project._id,

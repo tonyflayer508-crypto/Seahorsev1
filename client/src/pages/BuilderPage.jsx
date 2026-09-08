@@ -31,7 +31,7 @@ const {
   loadProject,
   logout,
   chatLoading,
-  handlechat
+  handleChat
   
 } = useAppContext();
 
@@ -42,7 +42,7 @@ useEffect(() => {
   if (!id) return;
 
   loadProject(id);
-}, [id]);
+}, [id, loadProject]);
 
 
 useEffect(() => {
@@ -71,10 +71,10 @@ const handlePublish = async () => {
     await api.post(`/api/projects/${id}/publish`);
     const url = `${window.location.origin}/publish/${id}`;
     setPublishUrl(url);
-    toast.success("Website published sussessfully!")
+    toast.success("Website published successfully!")
   } catch (err) {
     console.error("Publish failed:", err);
-    toast.error(err?.response?.date?.error || "Publish failed")
+    toast.error(err?.response?.data?.error || "Publish failed")
   }finally{
     setPublishing(false)
   }
@@ -143,7 +143,7 @@ if (loadingActiveProject || !activeProject) {
               leftTab === "chat" ? (
                  <ChatPanel
                      messages={activeProject.messages }
-                     onSend={handlechat}
+                     onSend={handleChat}
                      loading={chatLoading}/>
                            ) : (
                       <FileExplorer files={activeProject.files} activeFile={activeFile}
@@ -159,7 +159,7 @@ if (loadingActiveProject || !activeProject) {
              
               <div className='flex-1 overflow-hidden'>
                 { activeProject.status === "pending" || activeProject.status === "generating" || 
-                activeProject.status === "faild" ?  (
+                activeProject.status === "failed" ?  (
                  <AgentProgressDashboard project={activeProject}/>
                 ) : (
                  <PreviewPanel project={activeProject} activeFile={activeFile} showCode={showCode}/>

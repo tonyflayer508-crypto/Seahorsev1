@@ -28,7 +28,7 @@ export async function chat(req, res) {
         return res.status(404).json({ error: "Project not found" });
     }
 
-    project.status = "revising";
+    project.status = "generating";
     project.messages.push({
         role: "user",
         content: prompt.trim(),

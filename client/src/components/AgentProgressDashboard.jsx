@@ -1,7 +1,7 @@
 import { CheckCircle2Icon, CircleIcon, Loader2Icon } from "lucide-react";
 
 export default function AgentProgressDashboard({ project }) {
-    const planned = project.filesPlanned || [];
+    const planned = project.filePlanned || [];
     const completed = project.filesGenerated || [];
     const current = project.currentFile;
     const isFailed = project.status === "failed";

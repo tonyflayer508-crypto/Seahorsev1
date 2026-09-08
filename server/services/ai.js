@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import pMap from 'p-map';
 import { z } from 'zod';
 import { FileCodeSchema, FileplanSchema, RevisionRequestSchema } from './ai.Schemas.js';
@@ -18,6 +18,66 @@ const openrouter = createOpenAI({
 
 const model = openrouter(MODEL);
 
+function parseJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) {
+    throw new Error('The AI response did not contain a JSON object');
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+    } else if (character === '{') {
+      depth += 1;
+    } else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return JSON.parse(text.slice(start, index + 1));
+      }
+    }
+  }
+
+  throw new Error('The AI response contained incomplete JSON');
+}
+
+async function generateStructuredObject({ schema, system, prompt, maxRetries = 2 }) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const response = await generateText({
+        model,
+        system,
+        prompt: `${prompt}\n\nReturn only one valid JSON object. Do not use markdown fences or explanatory text.`,
+      });
+
+      return schema.parse(parseJsonObject(response.text));
+    } catch (error) {
+      lastError = error;
+      console.warn(`[AI] Invalid JSON response on attempt ${attempt + 1}: ${error.message}`);
+    }
+  }
+
+  throw new Error(`AI returned an invalid JSON response after ${maxRetries + 1} attempts: ${lastError.message}`);
+}
+
 // Generate a single file's code
 async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles) {
   const system = buildFileCodeSystem(allFiles, alreadyGeneratedFiles);
@@ -25,8 +85,7 @@ async function generateSingleFile(file, allFiles, prompt, alreadyGeneratedFiles)
 
   console.log(`[AI] Creating file: ${file.path}...`);
 
-  const { object } = await generateObject({
-    model,
+  const object = await generateStructuredObject({
     schema: FileCodeSchema,
     system,
     prompt: userMsg,
@@ -56,8 +115,7 @@ export async function generateProject(prompt, callbacks) {
   // Phase 1: Plan
   console.log(`[AI] Phase 1: Planning file structure for: "${prompt.slice(0, 80)}..."`);
 
-  const { object: plan } = await generateObject({
-    model,
+  const plan = await generateStructuredObject({
     schema: FileplanSchema,
     system: FILE_PLAN_SYSTEM,
     prompt: `Plan a React website for: ${prompt}`,
@@ -153,12 +211,15 @@ export async function generateProject(prompt, callbacks) {
 
       if (file.path.endsWith('.css')) {
         files[normalizedPath] = `/* ${file.description} - Generation failed, please retry */\n`;
-      } else if (file.path === '/App.js') {
+      } else if (/\.(js|jsx)$/.test(file.path)) {
+        const fileName = normalizedPath.split('/').pop().replace(/\.(js|jsx)$/, '');
+        const componentName = (fileName.replace(/[^a-zA-Z0-9_$]/g, '') || 'GeneratedComponent').replace(
+          /^(?=\d)/,
+          'Generated',
+        );
         files[normalizedPath] =
           "import React from 'react';\n\n" +
-          "// This file could not be generated. Please retry.\n" +
-          `// Purpose: ${file.description}\n\n` +
-          "export default function Placeholder() {\n" +
+          "export default function " + componentName + "() {\n" +
           "  return (\n" +
           "    <div className='p-8 text-center text-zinc-400'>\n" +
           "      <p>Component failed to generate. Please try again.</p>\n" +
@@ -202,9 +263,8 @@ contextParts.push(`\n## Revision Request\n${prompt}`);
 
 console.log("[AI] Revising project...");
 
-const { object: rawParsed } = await generateObject({
-    model,
-    schema: RevisionRequestSchema,
+const rawParsed = await generateStructuredObject({
+  schema: RevisionRequestSchema,
     system: REVISE_SYSTEM,
     prompt: contextParts.join("\n"),
     maxRetries: 2

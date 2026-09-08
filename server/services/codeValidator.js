@@ -58,7 +58,93 @@ export function validateAndFixCode(code, filePath, context) {
         }
     }
 
-    // 5. Ensure exactly one default export exists
+    // 5. Remove stray quotes before the closing backtick in JSX className templates.
+    // Some model responses produce: className={`... ${condition ? 'a' : 'b'}"`}
+    // The quote makes the following JSX attribute look like an unterminated expression.
+    const malformedClassNameTemplate = /(className=\{`[^`\n]*?)"(`\})/g;
+    if (malformedClassNameTemplate.test(code)) {
+        code = code.replace(malformedClassNameTemplate, "$1$2");
+        warnings.push(`${filePath}: Removed stray quote from JSX className template`);
+    }
+
+    // Close className template literals where the model omitted the final backtick.
+    // Example: className={`...'}" role="menuitem"`
+    const unclosedClassNameTemplate = /(className=\{`[^`\r\n]*)"(?=\s+[A-Za-z][\w-]*\s*=)/g;
+    if (unclosedClassNameTemplate.test(code)) {
+        code = code.replace(unclosedClassNameTemplate, "$1`");
+        warnings.push(`${filePath}: Closed unclosed JSX className template`);
+    }
+
+    const classNameQuoteBeforeExpressionEnd = /(className=\{`[^`\r\n]*)"(?=\s*\})/g;
+    if (classNameQuoteBeforeExpressionEnd.test(code)) {
+        code = code.replace(classNameQuoteBeforeExpressionEnd, "$1`");
+        warnings.push(`${filePath}: Replaced quote before JSX className expression end`);
+    }
+
+    // Repair an extra closing parenthesis in generated gradient expressions.
+    const malformedGradientExpression = ".replace(' to-', ', '))}";
+    if (code.includes(malformedGradientExpression)) {
+        code = code.replaceAll(malformedGradientExpression, ".replace(' to-', ', ')}");
+        warnings.push(`${filePath}: Removed extra parenthesis from gradient expression`);
+    }
+
+    const malformedDoubleQuotedGradientExpression = '.replace(" to-", ", "))}';
+    if (code.includes(malformedDoubleQuotedGradientExpression)) {
+        code = code.replaceAll(malformedDoubleQuotedGradientExpression, '.replace(" to-", ", ")}');
+        warnings.push(`${filePath}: Removed extra parenthesis from gradient expression`);
+    }
+
+    // Repair malformed JSX event handlers such as onChange={(event) = /> callback}.
+    const malformedEventHandler = /(\bon[A-Za-z]+\s*=\{\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*))\s*=\s*\/>/g;
+    if (malformedEventHandler.test(code)) {
+        code = code.replace(malformedEventHandler, "$1 =>");
+        warnings.push(`${filePath}: Repaired malformed JSX event handler`);
+    }
+
+    // Repair an extra brace in arrow expressions such as `items.map((item) => (}`.
+    const malformedArrowExpression = /(=>\s*\()\}/g;
+    if (malformedArrowExpression.test(code)) {
+        code = code.replace(malformedArrowExpression, "$1");
+        warnings.push(`${filePath}: Removed extra brace from arrow expression`);
+    }
+
+    // Remove a redundant default import when the component is also defined locally.
+    const localComponentDeclarations = [...code.matchAll(/(?:^|\n)\s*(?:export\s+default\s+)?function\s+([A-Z]\w*)\s*\(/g)]
+        .map((match) => match[1]);
+    for (const componentName of localComponentDeclarations) {
+        const duplicateImport = new RegExp(`^import\\s+${componentName}\\s+from\\s+['"][^'"]+['"];?\\s*$`, "gm");
+        if (duplicateImport.test(code)) {
+            code = code.replace(duplicateImport, "");
+            warnings.push(`${filePath}: Removed redundant import for locally defined '${componentName}'`);
+        }
+    }
+
+    // Restore a missing closing marker on standalone JSX tags, such as `span>`.
+    const bareClosingTag = /(^|\n)([ \t]*)span>/g;
+    if (bareClosingTag.test(code) && code.includes("<span")) {
+        code = code.replace(bareClosingTag, "$1$2</span>");
+        warnings.push(`${filePath}: Restored missing '</' on </span>`);
+    }
+
+    // Restore a missing opening angle bracket on standalone JSX tags.
+    const bareOpeningTags = ["div", "p", "section", "header", "footer", "main", "nav", "button"];
+    for (const tag of bareOpeningTags) {
+        const bareOpeningTag = new RegExp(`(^|\\n)([ \\t]*)${tag}(\\s[^>\\n]*)?>`, "g");
+        if (bareOpeningTag.test(code)) {
+            code = code.replace(bareOpeningTag, `$1$2<${tag}$3>`);
+            warnings.push(`${filePath}: Restored missing '<' on <${tag}>`);
+        }
+    }
+
+    // Close an inline span accidentally left open before its heading closes.
+    const openSpanBeforeHeadingEnd = /(<span\b[^>]*>\s*\n[ \t]*[^<\n][^\n]*)(\n[ \t]*<\/h1>)/g;
+    code = code.replace(openSpanBeforeHeadingEnd, (match, spanContent, headingEnd) => {
+        if (spanContent.includes("</span>")) return match;
+        warnings.push(`${filePath}: Added missing </span> before </h1>`);
+        return `${spanContent}\n</span>${headingEnd}`;
+    });
+
+    // 6. Ensure exactly one default export exists
     const defaultExportCount = (code.match(/export\s+default\s+/g) || []).length;
     if (defaultExportCount === 0 && !filePath.endsWith(".css")) {
         // Try to find the main function/component and add default export
@@ -80,7 +166,7 @@ export function validateAndFixCode(code, filePath, context) {
         }
     }
 
-    // 6. Remove stray HTML comments inside JSX return blocks
+    // 7. Remove stray HTML comments inside JSX return blocks
     // Pattern: <!-- comment --> which is invalid in JSX
     const htmlCommentRegex = /<!--[\s\S]*?-->/g;
     if (htmlCommentRegex.test(code)) {
@@ -88,7 +174,7 @@ export function validateAndFixCode(code, filePath, context) {
         warnings.push(`${filePath}: Removed HTML comments (invalid in JSX)`);
     }
 
-    // 7. Fix common TypeScript syntax that slips in
+    // 8. Fix common TypeScript syntax that slips in
     // Remove `: React.FC` or `: FC` type annotations from function declarations
     code = code.replace(/:\s*React\.FC(?:<[^>]*>)?\s*=/g, (match) => {
         warnings.push(`${filePath}: Removed TypeScript React.FC annotation`);
@@ -102,7 +188,7 @@ export function validateAndFixCode(code, filePath, context) {
         return `${before}${after}`;
     });
 
-    // 8. Ensure React import exists if JSX is used
+    // 9. Ensure React import exists if JSX is used
     const hasJSX = /<[A-Za-z]/.test(code);
     const hasReactImport = /import\s+React/.test(code);
     if (hasJSX && !hasReactImport) {
@@ -110,7 +196,7 @@ export function validateAndFixCode(code, filePath, context) {
         warnings.push(`${filePath}: Added missing React import`);
     }
 
-    // 9. Fix import paths that point to incorrect folders/paths compared to what was planned
+    // 10. Fix import paths that point to incorrect folders/paths compared to what was planned
     if (context?.allPlannedFiles) {
         const fixResult = fixImportPaths(code, filePath, context.allPlannedFiles);
         code = fixResult.code;
@@ -234,13 +320,22 @@ function fixImportPaths(code, filePath, allPlannedFiles) {
         const resolvedClean = cleanExtension(resolvedTarget);
 
         // Check if it already matches a planned file path exactly (with or without extension)
-        const exactExists = plannedPaths.some((p) => cleanExtension(p) === resolvedClean);
+        const hasImportExtension = /\.(js|jsx|css|ts|tsx)$/.test(resolvedTarget);
+        const exactExists = plannedPaths.some((p) =>
+            p === resolvedTarget || (!hasImportExtension && cleanExtension(p) === resolvedClean)
+        );
         if (exactExists) {
             return match;
         }
 
+        // Do not redirect a missing CSS import to a same-named JavaScript component.
+        if (/\.css$/.test(importTarget) && prefix === "import '") {
+            warnings.push(`${filePath}: Removed missing stylesheet import '${importTarget}'`);
+            return "";
+        }
+
         // 2. Mismatch! Try to find a planned file with the same filename
-        const importFilename = resolvedClean.split("/").pop();
+            const importFilename = resolvedClean.split("/").pop();
         if (!importFilename) {
             return match;
         }

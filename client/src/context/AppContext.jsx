@@ -59,7 +59,7 @@ export function AppContextProvider({ children }) {
 
   useEffect(() => {
     checkSession();
-  }, [])
+  }, [checkSession]);
 
   // =========================
   // LOGIN
@@ -83,7 +83,9 @@ export function AppContextProvider({ children }) {
       const errMsg =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        "Invalid email or password";
+        (err?.response
+          ? "Invalid email or password"
+          : "Cannot connect to the server. Start the backend and try again.");
 
       toast.error(errMsg);
 
@@ -114,7 +116,9 @@ export function AppContextProvider({ children }) {
       const errMsg =
         err?.response?.data?.error ||
         err?.response?.data?.message ||
-        "Registration failed";
+        (err?.response
+          ? "Registration failed"
+          : "Cannot connect to the server. Start the backend and try again.");
 
       toast.error(errMsg);
 
@@ -335,7 +339,7 @@ export function AppContextProvider({ children }) {
         }finally{
           setChatLoading(false)
         }
-  },[activeProject,user]  
+  }, [activeProject, user]
  )
 
  const debouncedSave = React.useMemo(
@@ -344,7 +348,7 @@ export function AppContextProvider({ children }) {
       await api.put(`/api/projects/${id}/files`,{files})
     } catch (err) {
             console.error("Failed to auto-save files:" , err);
-            toast.error("Faild to save code modifications");
+            toast.error("Failed to save code modifications");
     }  
   }, 1000),[],
  )
@@ -352,7 +356,7 @@ export function AppContextProvider({ children }) {
   return ()=>{
     debouncedSave.cancel();
   }
- },[debounce])
+ },[debouncedSave])
 
 
 const updateProjectFiles = useCallback(
@@ -387,6 +391,7 @@ const updateProjectFiles = useCallback(
         generatingProject,
         handleGenerate,
         handleDelete,
+        handleChat,
 
         // Files / UI
         activeFile,
